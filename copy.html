@@ -22,7 +22,7 @@
         }
 
         .chess-board.flipped {
-            transform: rotateZ(180deg);
+            transform: rotateX(180deg);
         }
 
         .square {
@@ -108,8 +108,15 @@
 <div class="flex flex-col items-center">
     <div class="flex justify-center w-full" style="width: 100vmin; max-width: 540px;margin-left: -30px">
         <div class="w-8"></div> <!-- spacer for row numbers -->
-        <div class="flex justify-between w-full px-1" id="topLetters">
-            <!-- Letters will be inserted here by JavaScript -->
+        <div class="flex justify-between w-full px-1">
+            <span class="w-[11%] text-center font-bold">a</span>
+            <span class="w-[11%] text-center font-bold">b</span>
+            <span class="w-[11%] text-center font-bold">c</span>
+            <span class="w-[11%] text-center font-bold">d</span>
+            <span class="w-[11%] text-center font-bold">e</span>
+            <span class="w-[11%] text-center font-bold">f</span>
+            <span class="w-[11%] text-center font-bold">g</span>
+            <span class="w-[11%] text-center font-bold">h</span>
         </div>
     </div>
 
@@ -117,8 +124,15 @@
 
     <div class="flex justify-center w-full" style="width: 100vmin; max-width: 590px;">
         <div class="w-8"></div> <!-- spacer for row numbers -->
-        <div class="flex justify-between w-full px-2" id="bottomLetters">
-            <!-- Letters will be inserted here by JavaScript -->
+        <div class="flex justify-between w-full px-2">
+            <span class="w-[11%] text-center font-bold">a</span>
+            <span class="w-[11%] text-center font-bold">b</span>
+            <span class="w-[11%] text-center font-bold">c</span>
+            <span class="w-[11%] text-center font-bold">d</span>
+            <span class="w-[11%] text-center font-bold">e</span>
+            <span class="w-[11%] text-center font-bold">f</span>
+            <span class="w-[11%] text-center font-bold">g</span>
+            <span class="w-[11%] text-center font-bold">h</span>
         </div>
     </div>
 </div>
@@ -141,7 +155,6 @@
         let currentPlayer = 'white';
         let boardFlipped = false;
         let perspective = 'white'; // Current perspective (which side is at bottom)
-        let letters = boardFlipped ? ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].reverse() : ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 
         // Функція для отримання назви фігури українською
         function getPieceName(type) {
@@ -488,13 +501,9 @@
             // Toggle flipped class for animation
             chessBoard.classList.toggle('flipped');
 
-            // Update letters to show reversed when board is flipped
-            letters = boardFlipped ? ['h', 'g', 'f', 'e', 'd', 'c', 'b', 'a'] : ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-
             // Wait for animation to complete before re-rendering
             setTimeout(() => {
                 renderBoard();
-                renderLetters();
                 updateStatus();
             }, 800); // Match this duration with CSS transition time
         }
@@ -503,32 +512,8 @@
         newGameBtn.addEventListener('click', newGame);
         flipBoardBtn.addEventListener('click', flipBoard);
 
-        // Function to render letter coordinates
-        function renderLetters() {
-            const topLetters = document.getElementById('topLetters');
-            const bottomLetters = document.getElementById('bottomLetters');
-
-            topLetters.innerHTML = '';
-            bottomLetters.innerHTML = '';
-
-            letters.forEach((letter, index) => {
-                const spanTop = document.createElement('span');
-                spanTop.className = 'text-center font-bold';
-                spanTop.textContent = letters[index];
-
-                const spanBottom = document.createElement('span');
-                //spanBottom.className = 'w-[11%] text-center font-bold';
-                spanBottom.className = 'text-center font-bold';
-                spanBottom.textContent = letters[index];
-
-                topLetters.appendChild(spanTop);
-                bottomLetters.appendChild(spanBottom);
-            });
-        }
-
         // Начинаем новую игру
         newGame();
-        renderLetters();
     });
 </script>
 </body>
