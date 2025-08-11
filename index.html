@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Шахи</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Chess+Symbols&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .chess-board {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            width: 90vmin;
+            height: 90vmin;
+            max-width: 600px;
+            max-height: 600px;
+            border: 2px solid #333;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+            transform-style: preserve-3d;
+            transition: transform 0.8s ease;
+        }
+
+        .chess-board.flipped {
+            transform: rotateX(180deg);
+        }
+
+        .square {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .piece {
+            width: 80%;
+            height: 80%;
+            position: relative;
+            z-index: 10;
+            transition: transform 0.2s;
+            animation: appear 0.5s ease-out forwards;
+            opacity: 0;
+            transform: scale(0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .piece-unicode {
+            font-size: 160%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+            font-weight: bold;
+            font-family: 'Noto Chess Symbols', sans-serif;
+        }
+
+        @keyframes appear {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .piece.dragging {
+            transform: scale(1.2);
+            z-index: 20;
+        }
+
+        .piece.chess-piece.flipped {
+            transform: rotateX(180deg) !important;
+        }
+
+        .square.highlight {
+            background-color: rgba(255, 255, 0, 0.5) !important;
+        }
+
+        .square.possible-move {
+            background-color: rgba(0, 255, 0, 0.3) !important;
+        }
+
+        .square.last-move {
+            background-color: rgba(255, 215, 0, 0.3) !important;
+        }
+
+        @media (max-width: 768px) {
+            .chess-board {
+                width: 95vmin;
+                height: 95vmin;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
+<div class="text-center mb-4">
+    <h1 class="text-3xl font-bold text-gray-800 mb-2">Шахи</h1>
+    <div class="flex justify-center space-x-4 mb-4">
+        <button id="newGameBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">Нова гра</button>
+        <button id="flipBoardBtn" class="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded">Перевернути дошку</button>
+    </div>
+    <div id="status" class="text-xl font-semibold text-gray-700">Хід білих</div>
+</div>
+
+<div class="flex flex-col items-center">
+    <div class="flex justify-center w-full" style="width: 100vmin; max-width: 540px;margin-left: -30px">
+        <div class="w-8"></div> <!-- spacer for row numbers -->
+        <div class="flex justify-between w-full px-1">
+            <span class="w-[11%] text-center font-bold">a</span>
+            <span class="w-[11%] text-center font-bold">b</span>
+            <span class="w-[11%] text-center font-bold">c</span>
+            <span class="w-[11%] text-center font-bold">d</span>
+            <span class="w-[11%] text-center font-bold">e</span>
+            <span class="w-[11%] text-center font-bold">f</span>
+            <span class="w-[11%] text-center font-bold">g</span>
+            <span class="w-[11%] text-center font-bold">h</span>
+        </div>
+    </div>
+
+    <div class="chess-board" id="chessBoard"></div>
+
+    <div class="flex justify-center w-full" style="width: 100vmin; max-width: 590px;">
+        <div class="w-8"></div> <!-- spacer for row numbers -->
+        <div class="flex justify-between w-full px-2">
+            <span class="w-[11%] text-center font-bold">a</span>
+            <span class="w-[11%] text-center font-bold">b</span>
+            <span class="w-[11%] text-center font-bold">c</span>
+            <span class="w-[11%] text-center font-bold">d</span>
+            <span class="w-[11%] text-center font-bold">e</span>
+            <span class="w-[11%] text-center font-bold">f</span>
+            <span class="w-[11%] text-center font-bold">g</span>
+            <span class="w-[11%] text-center font-bold">h</span>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4 text-gray-600 text-center">
+    <p>Переміщайте фігури, клікаючи на них, а потім на клітинку призначення</p>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const chessBoard = document.getElementById('chessBoard');
+        const statusDisplay = document.getElementById('status');
+        const newGameBtn = document.getElementById('newGameBtn');
+        const flipBoardBtn = document.getElementById('flipBoardBtn');
+
+        let board = [];
+        let selectedPiece = null;
+        let possibleMoves = [];
+        let lastMove = null;
+        let currentPlayer = 'white';
+        let boardFlipped = false;
+        let perspective = 'white'; // Current perspective (which side is at bottom)
+
+        // Функція для отримання назви фігури українською
+        function getPieceName(type) {
+            const names = {
+                'pawn': 'пішак',
+                'rook': 'тура',
+                'knight': 'кінь',
+                'bishop': 'слон',
+                'queen': 'королева',
+                'king': 'король'
+            };
+            return names[type] || type;
+        }
+
+        // Инициализация доски
+        function initBoard() {
+            board = Array(8).fill().map(() => Array(8).fill(null));
+
+            // Расставляем пешки
+            for (let i = 0; i < 8; i++) {
+                board[1][i] = { type: 'pawn', color: 'black' };
+                board[6][i] = { type: 'pawn', color: 'white' };
+            }
+
+            // Расставляем остальные фигуры (черные)
+            board[0][0] = { type: 'rook', color: 'black' };
+            board[0][1] = { type: 'knight', color: 'black' };
+            board[0][2] = { type: 'bishop', color: 'black' };
+            board[0][3] = { type: 'queen', color: 'black' };
+            board[0][4] = { type: 'king', color: 'black' };
+            board[0][5] = { type: 'bishop', color: 'black' };
+            board[0][6] = { type: 'knight', color: 'black' };
+            board[0][7] = { type: 'rook', color: 'black' };
+
+            // Расставляем остальные фигуры (белые)
+            board[7][0] = { type: 'rook', color: 'white' };
+            board[7][1] = { type: 'knight', color: 'white' };
+            board[7][2] = { type: 'bishop', color: 'white' };
+            board[7][3] = { type: 'queen', color: 'white' };
+            board[7][4] = { type: 'king', color: 'white' };
+            board[7][5] = { type: 'bishop', color: 'white' };
+            board[7][6] = { type: 'knight', color: 'white' };
+            board[7][7] = { type: 'rook', color: 'white' };
+
+            renderBoard();
+            updateStatus();
+        }
+
+        // Отрисовка доски
+        function renderBoard() {
+            chessBoard.innerHTML = '';
+
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    // Calculate display coordinates based on flipped state
+                    const displayRow = boardFlipped ? 7 - row : row;
+                    const displayCol = boardFlipped ? 7 - col : col;
+
+                    const square = document.createElement('div');
+                    square.className = `square ${(displayRow + displayCol) % 2 === 0 ? 'bg-gray-200' : 'bg-gray-700'}`;
+                    square.dataset.row = row;
+                    square.dataset.col = col;
+
+                    // Подсветка последнего хода
+                    if (lastMove &&
+                        ((lastMove.from.row === row && lastMove.from.col === col) ||
+                            (lastMove.to.row === row && lastMove.to.col === col))) {
+                        square.classList.add('last-move');
+                    }
+
+                    // Подсветка возможных ходов
+                    if (possibleMoves.some(move => move.row === row && move.col === col)) {
+                        square.classList.add('possible-move');
+                    }
+
+                    // Подсветка выбранной фигуры
+                    if (selectedPiece && selectedPiece.row === row && selectedPiece.col === col) {
+                        square.classList.add('highlight');
+                    }
+
+                    // Добавление фигуры на клетку
+                    const piece = board[row][col];
+                    if (piece) {
+                        const pieceElement = document.createElement('div');
+                        pieceElement.className = `piece ${piece.color}-piece chess-piece ${boardFlipped ? 'flipped' : ''}`;
+                        pieceElement.dataset.type = piece.type;
+                        pieceElement.dataset.color = piece.color;
+                        const unicodeElement = document.createElement('div');
+                        unicodeElement.className = `piece-unicode`;
+
+                        // Unicode символы для шахматных фигур
+                        if (piece.type === 'pawn') {
+                            unicodeElement.textContent = piece.color === 'white' ? '♙' : '♟';
+                        } else if (piece.type === 'rook') {
+                            unicodeElement.textContent = piece.color === 'white' ? '♖' : '♜';
+                        } else if (piece.type === 'knight') {
+                            unicodeElement.textContent = piece.color === 'white' ? '♘' : '♞';
+                        } else if (piece.type === 'bishop') {
+                            unicodeElement.textContent = piece.color === 'white' ? '♗' : '♝';
+                        } else if (piece.type === 'queen') {
+                            unicodeElement.textContent = piece.color === 'white' ? '♕' : '♛';
+                        } else if (piece.type === 'king') {
+                            unicodeElement.textContent = piece.color === 'white' ? '♔' : '♚';
+                        }
+
+                        pieceElement.appendChild(unicodeElement);
+                        pieceElement.setAttribute('alt', `${piece.color} ${piece.type}`);
+                        pieceElement.setAttribute('title', `${piece.color === 'white' ? 'Біла' : 'Чорна'} ${getPieceName(piece.type)}`);
+
+                        // Добавляем обработчики событий для перемещения
+                        pieceElement.addEventListener('mousedown', (e) => handlePieceSelect(e, row, col));
+
+                        square.appendChild(pieceElement);
+                    }
+
+                    // Добавляем обработчик клика на клетку
+                    square.addEventListener('click', () => handleSquareClick(row, col));
+
+                    chessBoard.appendChild(square);
+                }
+            }
+        }
+
+        // Выбор фигуры
+        function handlePieceSelect(e, row, col) {
+            e.stopPropagation();
+
+            const piece = board[row][col];
+            if (piece && piece.color === currentPlayer) {
+                selectedPiece = { row, col, piece };
+                calculatePossibleMoves(row, col, piece);
+                renderBoard();
+            }
+        }
+
+        // Обработка клика на клетку
+        function handleSquareClick(row, col) {
+            // Если фигура уже выбрана, пытаемся сделать ход
+            if (selectedPiece) {
+                // Проверяем, является ли клик на возможный ход
+                const isPossibleMove = possibleMoves.some(move => move.row === row && move.col === col);
+
+                if (isPossibleMove) {
+                    makeMove(selectedPiece.row, selectedPiece.col, row, col);
+                }
+
+                // Сбрасываем выбор
+                selectedPiece = null;
+                possibleMoves = [];
+                renderBoard();
+            }
+        }
+
+        // Расчет возможных ходов (упрощенная версия)
+        function calculatePossibleMoves(row, col, piece) {
+            possibleMoves = [];
+
+            // Упрощенные правила движения фигур
+            switch (piece.type) {
+                case 'pawn':
+                    // Пешки двигаются вперед на одну клетку
+                    const direction = piece.color === 'white' ? -1 : 1;
+
+                    // Обычный ход вперед
+                    if (isValidSquare(row + direction, col) && !board[row + direction][col]) {
+                        possibleMoves.push({ row: row + direction, col });
+
+                        // Первый ход пешки - можно на две клетки
+                        if ((piece.color === 'white' && row === 6) ||
+                            (piece.color === 'black' && row === 1)) {
+                            if (!board[row + 2 * direction][col] && !board[row + direction][col]) {
+                                possibleMoves.push({ row: row + 2 * direction, col });
+                            }
+                        }
+                    }
+
+                    // Взятие по диагонали
+                    for (let dc of [-1, 1]) {
+                        const newCol = col + dc;
+                        if (isValidSquare(row + direction, newCol) &&
+                            board[row + direction][newCol] &&
+                            board[row + direction][newCol].color !== piece.color) {
+                            possibleMoves.push({ row: row + direction, col: newCol });
+                        }
+                    }
+                    break;
+
+                case 'rook':
+                    // Ладья двигается по горизонтали и вертикали
+                    for (let [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                        for (let i = 1; i < 8; i++) {
+                            const newRow = row + i * dr;
+                            const newCol = col + i * dc;
+
+                            if (!isValidSquare(newRow, newCol)) break;
+
+                            if (!board[newRow][newCol]) {
+                                possibleMoves.push({ row: newRow, col: newCol });
+                            } else {
+                                if (board[newRow][newCol].color !== piece.color) {
+                                    possibleMoves.push({ row: newRow, col: newCol });
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    break;
+
+                case 'knight':
+                    // Конь ходит буквой Г
+                    for (let [dr, dc] of [[2, 1], [2, -1], [-2, 1], [-2, -1],
+                        [1, 2], [1, -2], [-1, 2], [-1, -2]]) {
+                        const newRow = row + dr;
+                        const newCol = col + dc;
+
+                        if (isValidSquare(newRow, newCol) &&
+                            (!board[newRow][newCol] || board[newRow][newCol].color !== piece.color)) {
+                            possibleMoves.push({ row: newRow, col: newCol });
+                        }
+                    }
+                    break;
+
+                case 'bishop':
+                    // Слон двигается по диагонали
+                    for (let [dr, dc] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+                        for (let i = 1; i < 8; i++) {
+                            const newRow = row + i * dr;
+                            const newCol = col + i * dc;
+
+                            if (!isValidSquare(newRow, newCol)) break;
+
+                            if (!board[newRow][newCol]) {
+                                possibleMoves.push({ row: newRow, col: newCol });
+                            } else {
+                                if (board[newRow][newCol].color !== piece.color) {
+                                    possibleMoves.push({ row: newRow, col: newCol });
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    break;
+
+                case 'queen':
+                    // Ферзь - комбинация ладьи и слона
+                    for (let [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1],
+                        [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+                        for (let i = 1; i < 8; i++) {
+                            const newRow = row + i * dr;
+                            const newCol = col + i * dc;
+
+                            if (!isValidSquare(newRow, newCol)) break;
+
+                            if (!board[newRow][newCol]) {
+                                possibleMoves.push({ row: newRow, col: newCol });
+                            } else {
+                                if (board[newRow][newCol].color !== piece.color) {
+                                    possibleMoves.push({ row: newRow, col: newCol });
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    break;
+
+                case 'king':
+                    // Король ходит на одну клетку в любом направлении
+                    for (let dr = -1; dr <= 1; dr++) {
+                        for (let dc = -1; dc <= 1; dc++) {
+                            if (dr === 0 && dc === 0) continue;
+
+                            const newRow = row + dr;
+                            const newCol = col + dc;
+
+                            if (isValidSquare(newRow, newCol) &&
+                                (!board[newRow][newCol] || board[newRow][newCol].color !== piece.color)) {
+                                possibleMoves.push({ row: newRow, col: newCol });
+                            }
+                        }
+                    }
+                    break;
+            }
+        }
+
+        // Проверка, что клетка находится в пределах доски
+        function isValidSquare(row, col) {
+            return row >= 0 && row < 8 && col >= 0 && col < 8;
+        }
+
+        // Выполнение хода
+        function makeMove(fromRow, fromCol, toRow, toCol) {
+            const piece = board[fromRow][fromCol];
+
+            // Проверяем, что ход возможен
+            const isValidMove = possibleMoves.some(move => move.row === toRow && move.col === toCol);
+
+            if (piece && isValidMove) {
+                // Запоминаем последний ход для подсветки
+                lastMove = {
+                    from: { row: fromRow, col: fromCol },
+                    to: { row: toRow, col: toCol }
+                };
+
+                // Перемещаем фигуру
+                board[toRow][toCol] = piece;
+                board[fromRow][fromCol] = null;
+
+                // Проверка на превращение пешки
+                if (piece.type === 'pawn' && (toRow === 0 || toRow === 7)) {
+                    board[toRow][toCol].type = 'queen'; // Упрощенное превращение в ферзя
+                }
+
+                // Меняем игрока
+                currentPlayer = currentPlayer === 'white' ? 'black' : 'white';
+                updateStatus();
+            }
+        }
+
+        // Обновление статуса игры
+        function updateStatus() {
+            statusDisplay.textContent = `Хід ${currentPlayer === 'white' ? 'білих' : 'чорних'}`;
+        }
+
+        // Новая игра
+        function newGame() {
+            // Сначала очищаем доску с анимацией
+            chessBoard.style.opacity = '0.5';
+            setTimeout(() => {
+                selectedPiece = null;
+                possibleMoves = [];
+                lastMove = null;
+                currentPlayer = 'white';
+                boardFlipped = false;
+                initBoard();
+                chessBoard.style.opacity = '1';
+            }, 300);
+        }
+
+        // Flip the board perspective with 3D rotation
+        function flipBoard() {
+            boardFlipped = !boardFlipped;
+            perspective = perspective === 'white' ? 'black' : 'white';
+
+            // Toggle flipped class for animation
+            chessBoard.classList.toggle('flipped');
+
+            // Wait for animation to complete before re-rendering
+            setTimeout(() => {
+                renderBoard();
+                updateStatus();
+            }, 800); // Match this duration with CSS transition time
+        }
+
+        // Обработчики кнопок
+        newGameBtn.addEventListener('click', newGame);
+        flipBoardBtn.addEventListener('click', flipBoard);
+
+        // Начинаем новую игру
+        newGame();
+    });
+</script>
+</body>
+</html>
